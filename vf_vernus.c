@@ -19,12 +19,96 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#ifdef _WIN32
+#define PATH_SEPARATOR '\\'
+#else
+#define PATH_SEPARATOR '/'
+#endif
+
+
+
+static int str_last_index_of(const char* str, char c) 
+{
+	int lastIndex = -1;
+	int i;
+
+	for (i = 0; str[i] != '\0'; i++) 
+	{
+		if (str[i] == c) {
+			lastIndex = i;
+		}
+	}
+
+	return lastIndex;
+}
+
+static int str_sub_str(const char* str, char* sub_str, int from_index, int to_index)
+{
+	int nRet = -1;
+
+	int i,j;
+
+	j = 0;
+
+	for (i = 0; str[i] != '\0'; i++) 
+	{
+		if (i>=from_index&&i<=to_index)
+		{
+			sub_str[j] = str[i];
+			j++;
+		}
+	}
+
+	nRet = 0;
+
+
+	return nRet;
+}
+
+static int app_base_dir(char* path)
+{
+	int nRet = -1;
+
+
+	char* appDirPath[_MAX_PATH] = { 0 };
+
+	char* appFilePath[_MAX_PATH] = { 0 };
+	sprintf(appFilePath, "%s", _pgmptr);
+
+	int lastIndex = str_last_index_of(appFilePath, PATH_SEPARATOR);
+
+	if (lastIndex < 0)
+	{
+		if (getcwd(appDirPath, sizeof(appDirPath)))
+		{
+			strcpy(appDirPath, "./");
+		}
+
+		strcpy(path, appDirPath);
+
+		nRet = 0;
+
+		return nRet;
+	}
+
+	nRet = str_sub_str(appFilePath, appDirPath, 0, lastIndex);
+
+	if (nRet>=0)
+	{
+		strcpy(path, appDirPath);
+
+		nRet = 0;
+	}
+
+
+	return nRet;
+}
 
 
 typedef struct {
 	const AVClass* class;
-	
-	char*           mMixName;
+
+	char* mMixName;
 	int64_t         mRenderStart;
 	int64_t         mRenderDuration;
 
@@ -33,8 +117,8 @@ typedef struct {
 	GLuint          mFragmentshader;
 	GLuint          mProgram;
 
-	
-	GLFWwindow*     window;
+
+	GLFWwindow* mWindow;
 	GLuint          mVAO;
 	GLuint          mVBO;
 	GLuint          mEBO;
@@ -42,7 +126,7 @@ typedef struct {
 
 	GLuint         mCodeVarPlayTime;
 	GLuint         mCodeVarTexture0;
-	
+
 } VernusContext;
 
 
@@ -84,7 +168,7 @@ AVFILTER_DEFINE_CLASS(vernus);
 //顶点数据
 static const float gVertices[] = {
 	// top left
-	-1.0 * -1.0, 1.0*-1.0, 0.0, // position
+	-1.0 * -1.0, 1.0 * -1.0, 0.0, // position
 	1.0, 0.0, 0.0, // Color
 	1.0, 0.0, // texture coordinates
 
@@ -115,7 +199,7 @@ static int initGLData(AVFilterContext* ctx)
 {
 	int nRet = -1;
 
-	VernusContext* vernusCtx=ctx->priv;
+	VernusContext* vernusCtx = ctx->priv;
 
 	glGenVertexArrays(1, &vernusCtx->mVAO);
 
@@ -135,7 +219,7 @@ static int initGLData(AVFilterContext* ctx)
 	//连接顶点数据
 	int offset = 0;
 	int stride = 3 * sizeof(float) + 3 * sizeof(float) + 2 * sizeof(float);
-	
+
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)offset);
 
 	glEnableVertexAttribArray(0);
@@ -218,13 +302,13 @@ static int readShaderCode(AVFilterContext* ctx, const char* filePath, char* file
 	return nRet;
 }
 
-static GLuint buildShader(AVFilterContext* ctx, const GLchar* shaderCode, GLenum type) 
+static GLuint buildShader(AVFilterContext* ctx, const GLchar* shaderCode, GLenum type)
 {
-	GLuint ret=0;
+	GLuint ret = 0;
 
-	GLuint shader= glCreateShader(type);
+	GLuint shader = glCreateShader(type);
 
-	if (!shader || !glIsShader(shader)) 
+	if (!shader || !glIsShader(shader))
 	{
 		av_log(ctx, AV_LOG_ERROR, "vf_vernus: buildShader glCreateShader faild\n");
 		return ret;
@@ -246,12 +330,12 @@ static GLuint buildShader(AVFilterContext* ctx, const GLchar* shaderCode, GLenum
 	int nInfoLogLength = 0;
 	glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &nInfoLogLength);
 
-	if (nInfoLogLength>0)
+	if (nInfoLogLength > 0)
 	{
-		char* sInfoMessage=(char*)malloc(nInfoLogLength);
-		
+		char* sInfoMessage = (char*)malloc(nInfoLogLength);
+
 		glGetShaderInfoLog(shader, nInfoLogLength, NULL, sInfoMessage);
-		
+
 		av_log(ctx, AV_LOG_ERROR, "vf_vernus: buildShader glCompileShader error:[%v]\n", sInfoMessage);
 
 		free(sInfoMessage);
@@ -266,7 +350,7 @@ static GLuint buildShader(AVFilterContext* ctx, const GLchar* shaderCode, GLenum
 
 
 
-static int buildProgram(AVFilterContext* ctx) 
+static int buildProgram(AVFilterContext* ctx)
 {
 	int nRet = -1;
 
@@ -274,25 +358,45 @@ static int buildProgram(AVFilterContext* ctx)
 
 	if (!vernusCtx->mMixName)
 	{
-		av_log(ctx, AV_LOG_ERROR, "vf_vernus: buildProgram error:[mix_name is null]\n");
+		av_log(ctx, AV_LOG_ERROR, "vf_vernus: buildProgram error:[mMixName is null]\n");
 		nRet = -101;
 		return nRet;
 	}
 
+	av_log(ctx, AV_LOG_INFO, "vf_vernus: buildProgram mMixName=[%s]\n", vernusCtx->mMixName);
 
-	char workDir[1024] = {0};
-	if (getcwd(workDir, sizeof(workDir)) == NULL) 
+
+	char workDir[_MAX_PATH] = { 0 };
+	if (app_base_dir(workDir)<0)
 	{
-		av_log(ctx, AV_LOG_ERROR, "vf_vernus: buildProgram error:[getcwd faild]\n");
+		av_log(ctx, AV_LOG_ERROR, "vf_vernus: buildProgram error:[app_base_dir faild]\n");
 		nRet = -102;
 		return nRet;
 	}
 
+	av_log(ctx, AV_LOG_INFO, "vf_vernus: buildProgram workDir=[%s]\n",workDir);
+
+	char xPathSplit[2] = { 0 };
+	xPathSplit[0] = PATH_SEPARATOR;
+
+
 	char vertexCodeFilePath[1024] = { 0 };
 	char fragmentCodeFilePath[1024] = { 0 };
 
-	sprintf(vertexCodeFilePath, "%s/effect/%s.vert", workDir, vernusCtx->mMixName);
-	sprintf(fragmentCodeFilePath, "%s/effect/%s.frag", workDir, vernusCtx->mMixName);
+	strcat(vertexCodeFilePath, workDir);
+	strcat(fragmentCodeFilePath, workDir);
+
+	strcat(vertexCodeFilePath, "effect");
+	strcat(fragmentCodeFilePath, "effect");
+
+	strcat(vertexCodeFilePath, xPathSplit);
+	strcat(fragmentCodeFilePath, xPathSplit);
+
+	strcat(vertexCodeFilePath, vernusCtx->mMixName);
+	strcat(fragmentCodeFilePath, vernusCtx->mMixName);
+
+	strcat(vertexCodeFilePath, ".vert");
+	strcat(fragmentCodeFilePath, ".frag");
 
 
 	av_log(ctx, AV_LOG_INFO, "vf_vernus: buildProgram vertex=[%s]\n", vertexCodeFilePath);
@@ -333,7 +437,7 @@ static int buildProgram(AVFilterContext* ctx)
 		return nRet;
 	}
 
-	av_log(ctx, AV_LOG_INFO,"vf_vernus:buildProgram buildShader vertex success\n");
+	av_log(ctx, AV_LOG_INFO, "vf_vernus:buildProgram buildShader vertex success\n");
 
 	vernusCtx->mFragmentshader = buildShader(ctx, sFragmentCode, GL_FRAGMENT_SHADER);
 
@@ -351,7 +455,7 @@ static int buildProgram(AVFilterContext* ctx)
 	av_log(ctx, AV_LOG_INFO, "vf_vernus:buildProgram buildShader fragment success\n");
 
 
-	vernusCtx->mProgram= glCreateProgram();
+	vernusCtx->mProgram = glCreateProgram();
 
 	glAttachShader(vernusCtx->mProgram, vernusCtx->mVetexShader);
 	glAttachShader(vernusCtx->mProgram, vernusCtx->mFragmentshader);
@@ -359,7 +463,7 @@ static int buildProgram(AVFilterContext* ctx)
 
 	GLint status = 0;
 	glGetProgramiv(vernusCtx->mProgram, GL_LINK_STATUS, &status);
-	if (status!= GL_TRUE)
+	if (status != GL_TRUE)
 	{
 		nRet = -112;
 		return nRet;
@@ -367,8 +471,8 @@ static int buildProgram(AVFilterContext* ctx)
 
 	glUseProgram(vernusCtx->mProgram);
 
-	vernusCtx->mCodeVarPlayTime= glGetUniformLocation(vernusCtx->mProgram, "iPlayTime");
-	vernusCtx->mCodeVarTexture0= glGetUniformLocation(vernusCtx->mProgram, "iTexture0");
+	vernusCtx->mCodeVarPlayTime = glGetUniformLocation(vernusCtx->mProgram, "iPlayTime");
+	vernusCtx->mCodeVarTexture0 = glGetUniformLocation(vernusCtx->mProgram, "iTexture0");
 
 	glUniform1f(vernusCtx->mCodeVarPlayTime, 0.0f);
 
@@ -400,8 +504,8 @@ static int processFrameFormatChange(AVFilterLink* inlink, AVFrame* src, AVFrame*
 		return nRet;
 	}
 
-	int nRes=sws_scale(swsCtx, src->data, src->linesize, 0, src->height, dst->data, dst->linesize);
-	if (nRes>=0)
+	int nRes = sws_scale(swsCtx, src->data, src->linesize, 0, src->height, dst->data, dst->linesize);
+	if (nRes >= 0)
 	{
 		nRet = 0;
 	}
@@ -440,17 +544,17 @@ static int processFrameRGBA(AVFilterLink* inlink, AVFrame* src)
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB_ALPHA, src->width, src->height, 0, GL_RGBA, GL_UNSIGNED_BYTE, src->data[0]);
 	glGenerateMipmap(GL_TEXTURE_2D);
 
-	glUniform1i(vernusCtx->mCodeVarTexture0,0);
+	glUniform1i(vernusCtx->mCodeVarTexture0, 0);
 
 	//绘制顶点
 	glBindVertexArray(vernusCtx->mVAO);
 
 
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
-	
+
 	glReadPixels(0, 0, src->width, src->height, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)src->data[0]);
 
-	glfwSwapBuffers(vernusCtx->window);
+	glfwSwapBuffers(vernusCtx->mWindow);
 
 	glBindVertexArray(0);
 
@@ -481,9 +585,9 @@ static int inputConfig(AVFilterLink* inlink)
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_VISIBLE, 0);
 
-	vernusCtx->window = glfwCreateWindow(inlink->w, inlink->h, "VernusFilter", NULL, NULL);
+	vernusCtx->mWindow = glfwCreateWindow(inlink->w, inlink->h, "VernusFilter", NULL, NULL);
 
-	glfwMakeContextCurrent(vernusCtx->window);
+	glfwMakeContextCurrent(vernusCtx->mWindow);
 
 	if (glewInit() != GLEW_OK) {
 		av_log(filterCtx, AV_LOG_ERROR, "vf_vernus:inputConfig glew init faild\n");
@@ -494,7 +598,7 @@ static int inputConfig(AVFilterLink* inlink)
 	glViewport(0, 0, inlink->w, inlink->h);
 	glClearColor(0, 0, 0, 1);
 
-	
+
 	nRet = initGLData(filterCtx);
 	if (nRet < 0)
 	{
@@ -511,7 +615,7 @@ static int inputConfig(AVFilterLink* inlink)
 		return nRet;
 	}
 	av_log(filterCtx, AV_LOG_INFO, "vf_vernus:inputConfig buildProgram success\n");
-	
+
 	nRet = 0;
 
 	av_log(filterCtx, AV_LOG_INFO, "vf_vernus:inputConfig end\n");
@@ -530,22 +634,22 @@ static int inputFilterFrame(AVFilterLink* inlink, AVFrame* in)
 	AVFilterContext* ctx = inlink->dst;
 	AVFilterLink* outlink = ctx->outputs[0];
 
-    VernusContext* vernusCtx = ctx->priv;
+	VernusContext* vernusCtx = ctx->priv;
 
-    double currentTimeSec=outlink->current_pts*av_q2d(outlink->time_base);
+	double currentTimeSec = outlink->current_pts * av_q2d(outlink->time_base);
 	double processStartTimeSec = vernusCtx->mRenderStart;
 	double processEndTimeSec = vernusCtx->mRenderStart + vernusCtx->mRenderDuration;
 
 	av_log(ctx, AV_LOG_INFO, "vf_vernus: inputFilterFrame currentTimeSec=[%lf] processStartTimeSec=[%lf] processEndTimeSec=[%lf]\n", currentTimeSec, processStartTimeSec, processEndTimeSec);
 
 	//不在时间范围内,不处理
-	if (currentTimeSec<processStartTimeSec ||currentTimeSec>processEndTimeSec)
+	if (currentTimeSec<processStartTimeSec || currentTimeSec>processEndTimeSec)
 	{
 		return ff_filter_frame(outlink, in);
 	}
 
 	AVFrame* outFrame = av_frame_alloc();
-	if (!outFrame) 
+	if (!outFrame)
 	{
 		return ff_filter_frame(outlink, in);
 	}
@@ -554,24 +658,24 @@ static int inputFilterFrame(AVFilterLink* inlink, AVFrame* in)
 	outFrame->height = in->height;
 	outFrame->format = AV_PIX_FMT_RGBA;
 
-	int outFrameBuffSize = av_image_get_buffer_size(outFrame->format, outFrame->width, outFrame->height,1);
-	void* outFrameBuff=av_malloc(outFrameBuffSize);
+	int outFrameBuffSize = av_image_get_buffer_size(outFrame->format, outFrame->width, outFrame->height, 1);
+	void* outFrameBuff = av_malloc(outFrameBuffSize);
 	av_image_fill_arrays(&outFrame->data, outFrame->linesize, outFrameBuff, outFrame->format, outFrame->width, outFrame->height, 1);
 
 
 	int swsRet = processFrameFormatChange(inlink, in, outFrame);
-	if (swsRet>=0)
+	if (swsRet >= 0)
 	{
 
 		av_log(ctx, AV_LOG_INFO, "vf_vernus: inputFilterFrame processFrameFormatChange currentTimeSec=[%lf] in->out success\n", currentTimeSec);
 
 		swsRet = processFrameRGBA(inlink, outFrame);
 
-		if (swsRet>=0)
+		if (swsRet >= 0)
 		{
 			swsRet = processFrameFormatChange(inlink, outFrame, in);
 
-			if (swsRet>=0)
+			if (swsRet >= 0)
 			{
 				av_log(ctx, AV_LOG_INFO, "vf_vernus: inputFilterFrame processFrameFormatChange out->in success\n");
 			}
@@ -579,7 +683,7 @@ static int inputFilterFrame(AVFilterLink* inlink, AVFrame* in)
 		}
 
 	}
-	
+
 
 	av_free(outFrameBuff);
 	av_frame_free(&outFrame);
@@ -595,14 +699,14 @@ static av_cold int init(AVFilterContext* ctx)
 {
 	VernusContext* vernusCtx = ctx->priv;
 
-	glfwSetErrorCallback(glfwOnError);	
+	glfwSetErrorCallback(glfwOnError);
 	return 0;
 }
 
 
 void glfwOnError(int error, const char* description)
 {
-	av_log(0, AV_LOG_ERROR,"vf_vernus: glfw error #[%d]:\n[%s]\n",error,description);
+	av_log(0, AV_LOG_ERROR, "vf_vernus: glfw error #[%d]:\n[%s]\n", error, description);
 }
 
 
@@ -652,15 +756,21 @@ static av_cold void uninit(AVFilterContext* ctx)
 	if (vernusCtx->mProgram)
 	{
 		glDeleteProgram(vernusCtx->mProgram);
-		vernusCtx->mProgram =0;
+		vernusCtx->mProgram = 0;
 	}
 
-	
-	//清理窗口
-	if (vernusCtx->window)
+	if (vernusCtx->mFrameTexture)
 	{
-		glfwDestroyWindow(vernusCtx->window);
-		vernusCtx->window = NULL;
+		GLuint xTextures[] = { vernusCtx->mFrameTexture };
+		glDeleteTextures(1, xTextures);
+	}
+
+
+	//清理窗口
+	if (vernusCtx->mWindow)
+	{
+		glfwDestroyWindow(vernusCtx->mWindow);
+		vernusCtx->mWindow = NULL;
 	}
 
 }
