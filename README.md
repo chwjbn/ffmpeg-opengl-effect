@@ -1,5 +1,5 @@
 # ffmpeg-opengl-effect
-### ffmpeg effect with opengl
+### ffmpeg effect with opengl,支持ffmpeg7和opengl3.3 core模式的视频滤镜特效,演示抖音灵魂出窍特效
 ##### 编译说明
 - 编译环境:msys2\ffmpeg7,环境准备build-env.sh脚本,编译参数参考build-ffmpeg.sh脚本
 - 复制vf_vernus.c到libavfilter目录下
