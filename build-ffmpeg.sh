@@ -8,7 +8,7 @@ cd ${basepath}/src  # 根据路径名称自行修改
 pwd
 
 
-#指定PKG_CONFIG_PATH变量，告知编译器x264库的路径
+#指定PKG_CONFIG_PATH变量
 echo ${PKG_CONFIG_PATH}
 
 
@@ -52,7 +52,6 @@ echo ${PKG_CONFIG_PATH}
   --extra-libs=-lopengl32 \
   --extra-libs=-lglew32 \
   --extra-libs=-lglfw3 \
-  --enable-filter=shadertoy \
   --enable-filter=vernus \
   --enable-static
  
