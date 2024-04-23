@@ -8,11 +8,11 @@ cd ${basepath}/src  # 根据路径名称自行修改
 pwd
 
 
-#指定PKG_CONFIG_PATH变量
+#指定PKG_CONFIG_PATH变量，告知编译器x264库的路径
 echo ${PKG_CONFIG_PATH}
 
 
-#make clean
+make clean
 
 #配置编译参数
 ./configure --prefix=${basepath}/out \
@@ -41,7 +41,6 @@ echo ${PKG_CONFIG_PATH}
   --enable-demuxer=dash     \
   --enable-libxml2 \
   --enable-nonfree \
-  --enable-shared \
   --enable-opengl \
   --disable-doc  \
   --disable-htmlpages  \
@@ -52,8 +51,7 @@ echo ${PKG_CONFIG_PATH}
   --extra-libs=-lopengl32 \
   --extra-libs=-lglew32 \
   --extra-libs=-lglfw3 \
-  --enable-filter=vernus \
-  --enable-static
+  --enable-filter=vernus
  
 #开始8线程编译
 make -j8
