@@ -336,7 +336,7 @@ static GLuint buildShader(AVFilterContext* ctx, const GLchar* shaderCode, GLenum
 
 		glGetShaderInfoLog(shader, nInfoLogLength, NULL, sInfoMessage);
 
-		av_log(ctx, AV_LOG_ERROR, "vf_vernus: buildShader glCompileShader error:[%v]\n", sInfoMessage);
+		av_log(ctx, AV_LOG_ERROR, "vf_vernus: buildShader glCompileShader error:[%s]\n", sInfoMessage);
 
 		free(sInfoMessage);
 
