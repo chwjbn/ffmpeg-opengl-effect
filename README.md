@@ -6,6 +6,11 @@
 - 修改libavfilter目录下Makefile,在  OBJS-$(CONFIG_ZSCALE_FILTER)                 += vf_zscale.o  下面一行添加 OBJS-$(CONFIG_VERNUS_FILTER)                 += vf_vernus.o
 - 修改libavfilter目录下allfilters.c文件,在extern const AVFilter ff_vf_zscale;下面一行添加extern const AVFilter ff_vf_vernus;
 
+#### 硬件加速
+- Invidia卡
+.\ffmpeg.exe -hwaccel cuda -c:v h264_cuvid -i .\test3.mp4 -c:v h264_nvenc .\test31.mp4
+- Intel卡
+.\ffmpeg.exe -hwaccel cuda -c:v h264_qsv -i .\test3.mp4 -c:v h264_qsv .\test31.mp4
 ##### 使用说明
 - 使用示例:.\ffplay.exe .\test\test.mp4 -vf "vernus=name=soul:start=2:duration=999"
 ###### 参数说明
