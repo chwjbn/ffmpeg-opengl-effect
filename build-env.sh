@@ -24,6 +24,9 @@ pacman -S mingw64/mingw-w64-x86_64-x265 --noconfirm
 pacman -S mingw64/mingw-w64-x86_64-fdk-aac --noconfirm
 pacman -S mingw64/mingw-w64-x86_64-libclc --noconfirm
 
+pacman -S mingw64/mingw-w64-x86_64-libmfx --noconfirm
+pacman -S mingw64/mingw-w64-x86_64-ffnvcodec-headers --noconfirm
+
 
 pacman -S pkg-config --noconfirm
 
