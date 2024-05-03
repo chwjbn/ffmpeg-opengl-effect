@@ -15,13 +15,11 @@ echo ${PKG_CONFIG_PATH}
 make clean
 
 #配置编译参数
-./configure --prefix=${basepath}/out \
+./configure \
+  --prefix=${basepath}/out \
   --arch=x86_64 \
   --enable-cross-compile \
   --pkg-config-flags=--static \
-  --extra-ldflags="-lm -lz -llzma -lpthread" \
-  --extra-libs=-lpthread \
-  --extra-libs=-lm \
   --enable-gpl \
   --enable-libfdk_aac \
   --enable-libfreetype \
@@ -34,22 +32,26 @@ make clean
   --enable-decoder=h264 \
   --enable-decoder=hevc \
   --enable-libass \
-  --enable-libfreetype       \
-  --enable-libfontconfig     \
-  --enable-libfribidi        \
-  --enable-libwebp           \
-  --enable-demuxer=dash     \
+  --enable-libfreetype \
+  --enable-fontconfig \
+  --enable-libfribidi \
+  --enable-libwebp \
+  --enable-demuxer=dash \
   --enable-libxml2 \
   --enable-nonfree \
   --enable-opengl \
   --enable-ffnvcodec --enable-postproc --enable-nvdec --enable-nvenc --enable-cuda --enable-cuvid --enable-encoder=h264_nvenc --enable-decoder=h264_cuvid \
-  --enable-libmfx --enable-encoder=h264_qsv --enable-decoder=h264_qsv \
+  --enable-libvpl --enable-encoder=h264_qsv --enable-decoder=h264_qsv \
   --disable-doc  \
   --disable-htmlpages  \
   --disable-manpages  \
   --disable-podpages  \
   --disable-txtpages \
+  --extra-cflags="-static" \
+  --extra-ldflags="-Bstatic -lm -lz -llzma -lpthread" \
   --extra-ldflags='-lopengl32 -lglew32 -lglfw3 -DGLEW_STATIC' \
+  --extra-libs=-lpthread \
+  --extra-libs=-lm \
   --extra-libs=-lopengl32 \
   --extra-libs=-lglew32 \
   --extra-libs=-lglfw3 \
