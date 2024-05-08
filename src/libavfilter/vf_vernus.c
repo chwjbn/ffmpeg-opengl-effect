@@ -1,6 +1,8 @@
 
 #include <stdio.h>
-#include <unistd.h>
+
+#include <io.h>
+#include <process.h>
 
 #include <math.h>
 
@@ -15,6 +17,7 @@
 
 #include "libswscale/swscale.h"
 
+#define GLEW_STATIC 
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -168,31 +171,32 @@ AVFILTER_DEFINE_CLASS(vernus);
 //顶点数据
 static const float gVertices[] = {
 	// top left
-	-1.0 * -1.0, 1.0 * -1.0, 0.0, // position
+	-1.0 * -1.0, 1.0, 0.0, // position
 	1.0, 0.0, 0.0, // Color
-	1.0, 0.0, // texture coordinates
+	0.0, 1.0, // texture coordinates
 
 	// top right
-	1.0 * -1.0, 1.0 * -1.0, 0.0,
+	-1.0 * 1.0, 1.0, 0.0,
 	0.0, 1.0, 0.0,
-	0.0, 0.0,
+	1.0, 1.0,
 
 	// bottom right
-	1.0 * -1.0, -1.0 * -1.0, 0.0,
+	-1.0 * 1.0, -1.0, 0.0,
 	0.0, 0.0, 1.0,
-	0.0, 1.0,
+	1.0, 0.0,
 
 	// bottom left
-	-1.0 * -1.0, -1.0 * -1.0, 0.0,
+	-1.0 * -1.0, -1.0, 0.0,
 	1.0, 1.0, 1.0,
-	1.0, 1.0,
+	0.0, 0.0,
 };
 
 
 //索引数据
 static const unsigned int gIndices[] = {
-	0, 1, 2,
-	0, 2, 3
+	// rectangle
+	0, 1, 2, // top triangle
+	0, 2, 3, // bottom triangle
 };
 
 static int initGLData(AVFilterContext* ctx)
@@ -599,6 +603,8 @@ static int inputConfig(AVFilterLink* inlink)
 
 	glViewport(0, 0, inlink->w, inlink->h);
 	glClearColor(0, 0, 0, 1);
+
+	glEnable(GL_FRAMEBUFFER_SRGB);  //gamma校正
 
 
 	nRet = initGLData(filterCtx);
