@@ -209,6 +209,8 @@ static int initGLData(AVFilterContext* ctx)
 
 	VernusContext* vernusCtx = ctx->priv;
 
+
+	//顶点数据初始化
 	glGenVertexArrays(1, &vernusCtx->mVAO);
 
 
@@ -245,7 +247,7 @@ static int initGLData(AVFilterContext* ctx)
 	glBindVertexArray(0);
 
 
-	//创建纹理并且初始化
+	//纹理数据初始化
 	glGenTextures(1, &vernusCtx->mFrameTexture);
 
 	//绑定纹理到TEXTURE0
@@ -535,11 +537,15 @@ static int processFrameRGBA(AVFilterLink* inlink, AVFrame* src)
 	AVFilterContext* filterCtx = inlink->dst;
 	VernusContext* vernusCtx = filterCtx->priv;
 
+	//绑定上下文
+	glfwMakeContextCurrent(vernusCtx->mWindow);
+
 	glViewport(0, 0, src->width, src->height);
 
 	glClearColor(0, 0, 0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 
+	//绑定着色器程序
 	glUseProgram(vernusCtx->mProgram);
 
 
@@ -547,6 +553,7 @@ static int processFrameRGBA(AVFilterLink* inlink, AVFrame* src)
 	double playTime = glfwGetTime();
 	glUniform1f(vernusCtx->mCodeVarPlayTime, playTime);
 
+	//传递长宽
 	glUniform1f(vernusCtx->mCodeVarWidth, vernusCtx->mWidth);
 	glUniform1f(vernusCtx->mCodeVarHeight, vernusCtx->mHeight);
 
@@ -560,11 +567,12 @@ static int processFrameRGBA(AVFilterLink* inlink, AVFrame* src)
 
 	glUniform1i(vernusCtx->mCodeVarTexture0, 0);
 
-	//绘制顶点
+	//绑定顶点
 	glBindVertexArray(vernusCtx->mVAO);
 
-
+	//绘制顶点
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, NULL);
+
 
 	glReadPixels(0, 0, src->width, src->height, GL_RGBA, GL_UNSIGNED_BYTE, (GLvoid*)src->data[0]);
 
@@ -606,7 +614,11 @@ static int inputConfig(AVFilterLink* inlink)
 	vernusCtx->mWidth = inlink->w;
 	vernusCtx->mHeight = inlink->h;
 
-	vernusCtx->mWindow = glfwCreateWindow(inlink->w, inlink->h, "VernusFilter", NULL, NULL);
+	char sWindName[250] = { 0 };
+	strcat(sWindName, "VernusFilter@");
+	strcat(sWindName, vernusCtx->mMixName);
+
+	vernusCtx->mWindow = glfwCreateWindow(inlink->w, inlink->h, sWindName, NULL, NULL);
 
 	glfwMakeContextCurrent(vernusCtx->mWindow);
 
@@ -621,7 +633,7 @@ static int inputConfig(AVFilterLink* inlink)
 
 	glEnable(GL_FRAMEBUFFER_SRGB);  //gamma校正
 
-
+	//初始化顶点数据/纹理数据
 	nRet = initGLData(filterCtx);
 	if (nRet < 0)
 	{
@@ -631,6 +643,7 @@ static int inputConfig(AVFilterLink* inlink)
 	av_log(filterCtx, AV_LOG_INFO, "vf_vernus:inputConfig initData success\n");
 
 
+	//编译着色器代码
 	nRet = buildProgram(filterCtx);
 	if (nRet < 0)
 	{
@@ -663,7 +676,7 @@ static int inputFilterFrame(AVFilterLink* inlink, AVFrame* in)
 	double processStartTimeSec = vernusCtx->mRenderStart;
 	double processEndTimeSec = vernusCtx->mRenderStart + vernusCtx->mRenderDuration;
 
-	av_log(ctx, AV_LOG_INFO, "vf_vernus: inputFilterFrame currentTimeSec=[%lf] processStartTimeSec=[%lf] processEndTimeSec=[%lf]\n", currentTimeSec, processStartTimeSec, processEndTimeSec);
+	av_log(ctx, AV_LOG_INFO, "vf_vernus: inputFilterFrame name=[%s] currentTimeSec=[%lf] processStartTimeSec=[%lf] processEndTimeSec=[%lf]\n", vernusCtx->mMixName, currentTimeSec, processStartTimeSec, processEndTimeSec);
 
 	//不在时间范围内,不处理
 	if (currentTimeSec<processStartTimeSec || currentTimeSec>processEndTimeSec)
@@ -690,7 +703,7 @@ static int inputFilterFrame(AVFilterLink* inlink, AVFrame* in)
 	if (swsRet >= 0)
 	{
 
-		av_log(ctx, AV_LOG_INFO, "vf_vernus: inputFilterFrame processFrameFormatChange currentTimeSec=[%lf] in->out success\n", currentTimeSec);
+		av_log(ctx, AV_LOG_INFO, "vf_vernus: inputFilterFrame name=[%s] processFrameFormatChange currentTimeSec=[%lf] in->out success\n", vernusCtx->mMixName, currentTimeSec);
 
 		swsRet = processFrameRGBA(inlink, outFrame);
 
@@ -700,7 +713,7 @@ static int inputFilterFrame(AVFilterLink* inlink, AVFrame* in)
 
 			if (swsRet >= 0)
 			{
-				av_log(ctx, AV_LOG_INFO, "vf_vernus: inputFilterFrame processFrameFormatChange out->in success\n");
+				av_log(ctx, AV_LOG_INFO, "vf_vernus: inputFilterFrame name=[%s]  processFrameFormatChange out->in success\n", vernusCtx->mMixName);
 			}
 
 		}
@@ -710,7 +723,6 @@ static int inputFilterFrame(AVFilterLink* inlink, AVFrame* in)
 
 	av_free(outFrameBuff);
 	av_frame_free(&outFrame);
-
 
 	return ff_filter_frame(outlink, in);
 }
