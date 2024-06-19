@@ -30,12 +30,12 @@
 
 
 
-static int str_last_index_of(const char* str, char c) 
+static int str_last_index_of(const char* str, char c)
 {
 	int lastIndex = -1;
 	int i;
 
-	for (i = 0; str[i] != '\0'; i++) 
+	for (i = 0; str[i] != '\0'; i++)
 	{
 		if (str[i] == c) {
 			lastIndex = i;
@@ -49,13 +49,13 @@ static int str_sub_str(const char* str, char* sub_str, int from_index, int to_in
 {
 	int nRet = -1;
 
-	int i,j;
+	int i, j;
 
 	j = 0;
 
-	for (i = 0; str[i] != '\0'; i++) 
+	for (i = 0; str[i] != '\0'; i++)
 	{
-		if (i>=from_index&&i<=to_index)
+		if (i >= from_index && i <= to_index)
 		{
 			sub_str[j] = str[i];
 			j++;
@@ -96,7 +96,7 @@ static int app_base_dir(char* path)
 
 	nRet = str_sub_str(appFilePath, appDirPath, 0, lastIndex);
 
-	if (nRet>=0)
+	if (nRet >= 0)
 	{
 		strcpy(path, appDirPath);
 
@@ -114,6 +114,8 @@ typedef struct {
 	char* mMixName;
 	int64_t         mRenderStart;
 	int64_t         mRenderDuration;
+	int32_t         mWidth;
+	int32_t         mHeight;
 
 
 	GLuint          mVetexShader;
@@ -129,6 +131,8 @@ typedef struct {
 
 	GLuint         mCodeVarPlayTime;
 	GLuint         mCodeVarTexture0;
+	GLuint         mCodeVarWidth;
+	GLuint         mCodeVarHeight;
 
 } VernusContext;
 
@@ -168,7 +172,7 @@ static const AVOption vernus_options[] = {
 AVFILTER_DEFINE_CLASS(vernus);
 
 
-//¶¥µãÊı¾İ
+//é¡¶ç‚¹æ•°æ®
 static const float gVertices[] = {
 	// top left
 	-1.0, 1.0, 0.0, // position
@@ -192,7 +196,7 @@ static const float gVertices[] = {
 };
 
 
-//Ë÷ÒıÊı¾İ
+//ç´¢å¼•æ•°æ®
 static const unsigned int gIndices[] = {
 	// rectangle
 	0, 1, 2, // top triangle
@@ -208,7 +212,7 @@ static int initGLData(AVFilterContext* ctx)
 	glGenVertexArrays(1, &vernusCtx->mVAO);
 
 
-	//°ó¶¨¶¥µã¿ªÊ¼²Ù×÷
+	//ç»‘å®šé¡¶ç‚¹å¼€å§‹æ“ä½œ
 	glBindVertexArray(vernusCtx->mVAO);
 
 	glGenBuffers(1, &vernusCtx->mVBO);
@@ -220,7 +224,7 @@ static int initGLData(AVFilterContext* ctx)
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vernusCtx->mEBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(gIndices), gIndices, GL_STATIC_DRAW);
 
-	//Á¬½Ó¶¥µãÊı¾İ
+	//è¿æ¥é¡¶ç‚¹æ•°æ®
 	int offset = 0;
 	int stride = 3 * sizeof(float) + 3 * sizeof(float) + 2 * sizeof(float);
 
@@ -237,14 +241,14 @@ static int initGLData(AVFilterContext* ctx)
 	glEnableVertexAttribArray(2);
 	offset += 2 * sizeof(float);
 
-	//½â°ó¶¥µã
+	//è§£ç»‘é¡¶ç‚¹
 	glBindVertexArray(0);
 
 
-	//´´½¨ÎÆÀí²¢ÇÒ³õÊ¼»¯
+	//åˆ›å»ºçº¹ç†å¹¶ä¸”åˆå§‹åŒ–
 	glGenTextures(1, &vernusCtx->mFrameTexture);
 
-	//°ó¶¨ÎÆÀíµ½TEXTURE0
+	//ç»‘å®šçº¹ç†åˆ°TEXTURE0
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, vernusCtx->mFrameTexture);
 
@@ -371,14 +375,14 @@ static int buildProgram(AVFilterContext* ctx)
 
 
 	char workDir[_MAX_PATH] = { 0 };
-	if (app_base_dir(workDir)<0)
+	if (app_base_dir(workDir) < 0)
 	{
 		av_log(ctx, AV_LOG_ERROR, "vf_vernus: buildProgram error:[app_base_dir faild]\n");
 		nRet = -102;
 		return nRet;
 	}
 
-	av_log(ctx, AV_LOG_INFO, "vf_vernus: buildProgram workDir=[%s]\n",workDir);
+	av_log(ctx, AV_LOG_INFO, "vf_vernus: buildProgram workDir=[%s]\n", workDir);
 
 	char xPathSplit[2] = { 0 };
 	xPathSplit[0] = PATH_SEPARATOR;
@@ -475,6 +479,9 @@ static int buildProgram(AVFilterContext* ctx)
 
 	glUseProgram(vernusCtx->mProgram);
 
+	vernusCtx->mCodeVarWidth = glGetUniformLocation(vernusCtx->mProgram, "iWidth");
+	vernusCtx->mCodeVarHeight = glGetUniformLocation(vernusCtx->mProgram, "iHeight");
+
 	vernusCtx->mCodeVarPlayTime = glGetUniformLocation(vernusCtx->mProgram, "iPlayTime");
 	vernusCtx->mCodeVarTexture0 = glGetUniformLocation(vernusCtx->mProgram, "iTexture0");
 
@@ -536,12 +543,15 @@ static int processFrameRGBA(AVFilterLink* inlink, AVFrame* src)
 	glUseProgram(vernusCtx->mProgram);
 
 
-	//´«µİÊ±¼ä
+	//ä¼ é€’æ—¶é—´
 	double playTime = glfwGetTime();
 	glUniform1f(vernusCtx->mCodeVarPlayTime, playTime);
 
+	glUniform1f(vernusCtx->mCodeVarWidth, vernusCtx->mWidth);
+	glUniform1f(vernusCtx->mCodeVarHeight, vernusCtx->mHeight);
 
-	//´«µİÎÆÀí
+
+	//ä¼ é€’çº¹ç†
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, vernusCtx->mFrameTexture);
 
@@ -550,7 +560,7 @@ static int processFrameRGBA(AVFilterLink* inlink, AVFrame* src)
 
 	glUniform1i(vernusCtx->mCodeVarTexture0, 0);
 
-	//»æÖÆ¶¥µã
+	//ç»˜åˆ¶é¡¶ç‚¹
 	glBindVertexArray(vernusCtx->mVAO);
 
 
@@ -591,6 +601,11 @@ static int inputConfig(AVFilterLink* inlink)
 	glfwWindowHint(GLFW_DECORATED, 0);
 	glfwWindowHint(GLFW_VISIBLE, 0);
 
+
+	//è®°å½•å›¾åƒå¤§å°
+	vernusCtx->mWidth = inlink->w;
+	vernusCtx->mHeight = inlink->h;
+
 	vernusCtx->mWindow = glfwCreateWindow(inlink->w, inlink->h, "VernusFilter", NULL, NULL);
 
 	glfwMakeContextCurrent(vernusCtx->mWindow);
@@ -604,7 +619,7 @@ static int inputConfig(AVFilterLink* inlink)
 	glViewport(0, 0, inlink->w, inlink->h);
 	glClearColor(0, 0, 0, 1);
 
-	glEnable(GL_FRAMEBUFFER_SRGB);  //gammaĞ£Õı
+	glEnable(GL_FRAMEBUFFER_SRGB);  //gammaæ ¡æ­£
 
 
 	nRet = initGLData(filterCtx);
@@ -650,7 +665,7 @@ static int inputFilterFrame(AVFilterLink* inlink, AVFrame* in)
 
 	av_log(ctx, AV_LOG_INFO, "vf_vernus: inputFilterFrame currentTimeSec=[%lf] processStartTimeSec=[%lf] processEndTimeSec=[%lf]\n", currentTimeSec, processStartTimeSec, processEndTimeSec);
 
-	//²»ÔÚÊ±¼ä·¶Î§ÄÚ,²»´¦Àí
+	//ä¸åœ¨æ—¶é—´èŒƒå›´å†…,ä¸å¤„ç†
 	if (currentTimeSec<processStartTimeSec || currentTimeSec>processEndTimeSec)
 	{
 		return ff_filter_frame(outlink, in);
@@ -727,7 +742,7 @@ static av_cold void uninit(AVFilterContext* ctx)
 		return;
 	}
 
-	//ÇåÀí¶¥µãÊı¾İ
+	//æ¸…ç†é¡¶ç‚¹æ•°æ®
 	if (vernusCtx->mVAO)
 	{
 		glDeleteVertexArrays(1, &vernusCtx->mVAO);
@@ -748,7 +763,7 @@ static av_cold void uninit(AVFilterContext* ctx)
 	}
 
 
-	//ÇåÀí×ÅÉ«Æ÷ºÍ³ÌĞò
+	//æ¸…ç†ç€è‰²å™¨å’Œç¨‹åº
 	if (vernusCtx->mVetexShader)
 	{
 		glDeleteShader(vernusCtx->mVetexShader);
@@ -774,7 +789,7 @@ static av_cold void uninit(AVFilterContext* ctx)
 	}
 
 
-	//ÇåÀí´°¿Ú
+	//æ¸…ç†çª—å£
 	if (vernusCtx->mWindow)
 	{
 		glfwDestroyWindow(vernusCtx->mWindow);
